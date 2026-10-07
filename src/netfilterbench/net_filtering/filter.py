@@ -75,7 +75,7 @@ def _ensure_undirected(G: nx.Graph, kwargs: dict) -> nx.Graph:
 # Filters
 # ---------------------------------------------------------------------------
 
-def mst(G: nx.Graph, **kwargs) -> nx.Graph:
+def maximum_spanning_tree(G: nx.Graph, **kwargs) -> nx.Graph:
     """
     Computes the Maximum Spanning Tree (or forest if disconnected).
 
@@ -262,9 +262,11 @@ def threshold(G: nx.Graph, **kwargs) -> nx.Graph:
     return H
 
 
-def local_degree_sparsifier(G: nx.Graph, **kwargs) -> nx.Graph:
+def degree_based_sparsifier(G: nx.Graph, **kwargs) -> nx.Graph:
     """
-    Sparsifies graph based on local node degrees.
+    Edges are ranked according to the minimum degree of their incident
+    vertices. The highest-ranked edges are retained until the desired
+    target ratio is reached.
 
     Args:
         G (nx.Graph): Input graph.
@@ -320,16 +322,26 @@ def random_edge_sparsifier(G: nx.Graph, **kwargs) -> nx.Graph:
     return H
 
 
-def simmelian_sparsifier(G: nx.Graph, **kwargs) -> nx.Graph:
+def simplified_simmelian_sparsifier(G: nx.Graph, **kwargs) -> nx.Graph:
     """
-    Implements Simmelian backbone sparsification.
+    A simplified version of the method proposed by Nick et al. (2013). For
+    each edge (u, v), the Simmelian strength is defined as the number of
+    common neighbors shared by its endpoints, i.e. the number of triangles
+    containing the edge. For each vertex, its neighbors are ranked in
+    descending order by Simmelian strength, and only the edges connecting
+    it to its top-`max_rank` neighbors are retained.
 
     Args:
         G (nx.Graph): Input graph.
-        max_rank (int, optional): Maximum rank considered for overlap calculation. Defaults to 5.
+        max_rank (int, optional): Number of top-ranked neighbors kept per
+            vertex. Defaults to 5.
 
     Returns:
         nx.Graph: Sparsified graph.
+
+    References:
+        Nick, B., Lee, C., Cunningham, P., & Brandes, U. (2013). Simmelian
+        Backbones: Amplifying Hidden Homophily in Facebook Networks. ASONAM.
     """
     G = _ensure_undirected(G, kwargs)
     max_rank = kwargs.get("max_rank", 5)
@@ -392,10 +404,14 @@ def disparity_filter(G: nx.Graph, **kwargs) -> nx.Graph:
     return H
 
 
-def overlapping_trees(G: nx.Graph, **kwargs) -> nx.Graph:
+def randomized_overlapping_trees(G: nx.Graph, **kwargs) -> nx.Graph:
     """
-    Implements the Overlapping Trees network reduction technique as described in
-    Garas and Argyrakis (2008) arXiv:0812.3227.
+    Inspired by the Overlapping Tree Network proposed by Garas and Argyrakis
+    (2009), multiple spanning trees are generated from the original network.
+    At each iteration, random weights are assigned to all edges, and a
+    minimum spanning tree is computed using these weights. The final network
+    is the union of all generated trees, after which the original edge
+    weights are restored.
 
     Args:
         G (nx.Graph): Input graph.
@@ -403,6 +419,10 @@ def overlapping_trees(G: nx.Graph, **kwargs) -> nx.Graph:
 
     Returns:
         nx.Graph: Reduced graph.
+
+    References:
+        Garas, A., & Argyrakis, P. (2009). Filtering of complex systems
+        using overlapping tree networks. EPL, arXiv:0812.3227.
     """
     G = _ensure_undirected(G, kwargs)
     num_trees = kwargs.get("num_trees", 3)

@@ -33,7 +33,7 @@ from netfilterbench import (
     calculate_jaccard_similarity,
     common_metrics,
     load_graph,
-    mst,
+    maximum_spanning_tree,
     predictive_filtering_metrics,
     run_experiment,
 )
@@ -57,7 +57,7 @@ pytestmark = pytest.mark.skipif(
 
 
 @functools.lru_cache(maxsize=None)
-def _run(graph_path, filter_func=mst, noise_level=0.1):
+def _run(graph_path, filter_func=maximum_spanning_tree, noise_level=0.1):
     # Cached: several tests below share the same (graph, filter, noise_level)
     # combination and would otherwise redundantly recompute all metrics.
     return run_experiment(
@@ -71,7 +71,7 @@ class TestResultSchema:
     @pytest.mark.parametrize("graph_path", REAL_NET_SAMPLE)
     def test_base_fields(self, graph_path):
         row = _run(graph_path)
-        assert row["filter"] == "mst"
+        assert row["filter"] == "maximum_spanning_tree"
         assert row["benchmark"] == "bench_noise_filtering"
         assert row["noise_level"] == 0.1
         assert row["graph_name"]
@@ -98,8 +98,8 @@ class TestDensityInvariants:
 
     @pytest.mark.parametrize("graph_path", REAL_NET_SAMPLE)
     def test_mst_never_increases_density(self, graph_path):
-        # MST only ever removes edges, so density cannot increase regardless
-        # of the noise added beforehand.
+        # A spanning tree only ever removes edges, so density cannot increase
+        # regardless of the noise added beforehand.
         row = _run(graph_path)
         assert row["density_filtered"] <= row["density_original"] + 1e-9
 
@@ -112,8 +112,9 @@ class TestDensityInvariants:
 
 class TestWattsStrogatzClustering:
     """Watts-Strogatz networks should keep their signature high clustering
-    even after noise + MST filtering is applied to the *original* graph
-    (checked here on the unfiltered/original side of the result)."""
+    even after noise + maximum spanning tree filtering is applied to the
+    *original* graph (checked here on the unfiltered/original side of the
+    result)."""
 
     @pytest.mark.skipif(
         not WS_SMALL_SAMPLE, reason="no small watts-strogatz graphs found"

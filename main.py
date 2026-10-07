@@ -21,15 +21,15 @@ Passing parameters to filters or indicators:
 from functools import partial
 
 from netfilterbench import (
-    mst,
+    maximum_spanning_tree,
     pmfg,
     tmfg,
     threshold,
     disparity_filter,
-    local_degree_sparsifier,
+    degree_based_sparsifier,
     random_edge_sparsifier,
-    simmelian_sparsifier,
-    overlapping_trees,
+    simplified_simmelian_sparsifier,
+    randomized_overlapping_trees,
     k_core_decomposition,
     calculate_information_retention,
     calculate_jaccard_similarity,
@@ -52,15 +52,15 @@ DATA_PATH = "data/incident_texts"
 OUTPUT_PATH = "results/c4.csv"
 
 FILTERS = [
-    mst,
+    maximum_spanning_tree,
     pmfg,
     tmfg,
     threshold,
     disparity_filter,
-    local_degree_sparsifier,
+    degree_based_sparsifier,
     random_edge_sparsifier,
-    simmelian_sparsifier,
-    overlapping_trees,
+    simplified_simmelian_sparsifier,
+    randomized_overlapping_trees,
     k_core_decomposition,
 ]
 

@@ -7,6 +7,7 @@ This repository implements a framework for benchmarking network filtering and sp
 - **data/**: Real and simulated networks used as benchmarking input
   - **real_nets/**: Networks extracted from the Index of Complex Networks (ICON), one graph per `.pickle` file under `real_nets/graphs/`, plus `ICON_info.csv` with per-network metadata
   - **simulated_nets/**: Synthetically generated networks (see `generate_simulated_networks.py`)
+  - **incident_texts/**: Weighted networks built from incident-report texts, one `.pickle` per product category (case study)
 - **src/netfilterbench/**: The installable package — everything below is importable as `netfilterbench` after installing it (see Installation)
   - **net_filtering/**: Implementation of the network filtering/sparsification techniques (`filter.py`)
   - **benchmark/**: Noise-injection and benchmarking logic (`benchmark.py`) and the network comparison metrics (`networkIndicators.py`)
@@ -14,7 +15,6 @@ This repository implements a framework for benchmarking network filtering and sp
   - **experiments/**: Runs a single filter/benchmark/noise-level combination on one graph (`experiment.py`) and orchestrates all combinations in parallel, writing results incrementally to CSV (`runner.py`)
 - **src/visualization/**: Generates the paper's result plots (`plots.py`) — project-specific analysis code, not part of the `netfilterbench` package
 - **main.py**: Configuration-driven entry point — pick filters, benchmarks, noise levels, and indicators, then run the full pipeline over `data/`
-- **compare_results.py**: Compares two result CSVs (e.g. before/after a code change) for a given filter/benchmark/noise-level combination
 - **results/**: Where benchmark results (CSVs) and generated plots are stored
 - **tests/**: Sanity tests for the pipeline (`pytest tests/`)
 
@@ -65,7 +65,7 @@ DATA_PATH = "data/real_nets/graphs"
 OUTPUT_PATH = "results/output.csv"
 
 FILTERS = [
-    mst,
+    maximum_spanning_tree,
     k_core_decomposition,
     # ... any subset of the filters in src/netfilterbench/net_filtering/filter.py
 ]
@@ -92,11 +92,11 @@ This writes one row per (graph, filter, benchmark, noise_level) combination to `
 To use the pipeline directly instead of going through `main.py` — e.g. from your own project, once `netfilterbench` is installed — call `run_experiment` for a single combination:
 
 ```python
-from netfilterbench import run_experiment, mst, bench_noise_filtering, calculate_jaccard_similarity
+from netfilterbench import run_experiment, maximum_spanning_tree, bench_noise_filtering, calculate_jaccard_similarity
 
 result = run_experiment(
     graph_path="data/simulated_nets/watts_strogatz/unweighted/0watts_strogatz_graph100.pickle",
-    filter_func=mst,
+    filter_func=maximum_spanning_tree,
     benchmark_func=bench_noise_filtering,
     noise_level=0.1,
     indicator_funcs=[calculate_jaccard_similarity],
@@ -120,13 +120,13 @@ Two benchmark variants are available, both defined in `src/netfilterbench/benchm
 1. **`bench_noise_filtering` (NBF — noise before filtering)**: adds random noise edges to the original network, applies the filter to the noisy network, and compares the result to the *original* network.
 2. **`bench_structural_noise_filtering` (NAF — noise after filtering)**: first applies the filter to the original network to obtain a structural baseline, adds noise to that structural network, applies the filter again, and compares the result to the *structural* (once-filtered) network — measuring how well the filter recovers a structure it has already produced, rather than the raw original.
 
-For both variants, the comparison between the two networks is done using the indicator functions configured in `INDICATOR_FUNCS` (see `src/netfilterbench/benchmark/networkIndicators.py`): edge-set similarity (Jaccard), degree-distribution similarity (information retention), edge-level prediction metrics (precision/recall/F1/RMSE), and a set of common structural metrics computed on both networks (degree, clustering, path length, centrality, assortativity, density, etc.).
+For both variants, the comparison between the two networks is done using the indicator functions configured in `INDICATOR_FUNCS` (see `src/netfilterbench/benchmark/networkIndicators.py`): edge-set similarity (Jaccard), degree-distribution similarity (information retention), edge-level prediction metrics (precision/recall/F1/RMSE), and a set of common structural metrics computed on both networks (degree, clustering, path length, centrality, assortativity, density, etc.). `common_metrics` also reports `triangles_spearman_correlation`: the Spearman correlation between per-node triangle counts in the two networks (over the nodes they share), measuring how well the filter preserves local triangle structure.
 
 > **Note on reproducibility:** noise injection is randomized. `bench_noise_filtering`/`bench_structural_noise_filtering` accept a `seed` parameter (default `42`), but at least one full round of the results currently in `results/` was generated without pinning it explicitly — those results are not guaranteed to be exactly reproducible from a fresh run.
 
 ## Available Data
 
-The `/data` directory contains both real and simulated network datasets for benchmarking purposes.
+The `/data` directory contains real, simulated, and incident-text network datasets for benchmarking purposes.
 
 ### Real Networks
 
@@ -146,19 +146,25 @@ For each model, 100 instances are generated at each of 10 sizes (100 to 1,000 no
 
 To regenerate these networks (or generate new ones), run `python data/simulated_nets/generate_simulated_networks.py` (pass `--override` to regenerate files that already exist).
 
+### Incident Texts
+
+`/data/incident_texts/` contains 15 weighted networks built from incident-report texts, one `.pickle` per product category (e.g. `baby.pickle`, `electronics.pickle`, `toys_and_children.pickle`). They are used as a case study (see `case_study_triangles_incident_texts.csv` under Visualizing Results).
+
+> **Note on edge weights:** the real (ICON) networks are unweighted, so only the five filters that don't depend on edge weights (degree-based, random edge, simplified Simmelian, randomized overlapping trees and k-core) give meaningful results on them. The incident-text networks are weighted, so all ten filters can run there.
+
 ## Available Network Filtering Techniques
 
 `src/netfilterbench/net_filtering/filter.py` implements the following filtering and sparsification techniques. All of them share a single interface — `func(graph: nx.Graph, **kwargs) -> nx.Graph` — and any parameters are passed as keyword arguments (see the `functools.partial` example above). Directed graphs are automatically converted to undirected via `to_undirected()` before filtering.
 
-1. **Minimum Spanning Tree** — `mst(graph)`: keeps the minimum set of edges connecting all nodes with the lowest total edge weight.
+1. **Maximum Spanning Tree** — `maximum_spanning_tree(graph)`: keeps the set of edges connecting all nodes with the highest total edge weight. (Named for the maximum, not minimum, variant — despite the classic "MST" abbreviation conventionally denoting the minimum spanning tree.)
 2. **Planar Maximally Filtered Graph (PMFG)** — `pmfg(graph)`: builds a planar graph that greedily maximizes total edge weight.
 3. **Triangulated Maximally Filtered Graph (TMFG)** — `tmfg(graph)`: builds a 3-planar (triangulated) graph maximizing total edge weight, faster to construct than PMFG.
-4. **Global Threshold Filter** — `threshold(graph, threshold=0.5)`: removes edges whose weight falls below the threshold.
-5. **Local Degree Sparsifier** — `local_degree_sparsifier(graph, target_ratio=0.5)`: keeps a target fraction of edges, prioritizing edges between higher-degree nodes.
+4. **Global Threshold Filter** — `threshold(graph, quantile=0.5)`: removes edges whose weight falls below a cutoff. By default the cutoff is the `quantile`-th quantile of the graph's own edge-weight distribution (the median), so filtering strength is comparable across graphs with different weight scales (e.g. `quantile=0.7` keeps roughly the strongest 30% of edges). Pass `threshold=<value>` to use a fixed absolute cutoff instead.
+5. **Degree-Based Sparsifier** — `degree_based_sparsifier(graph, target_ratio=0.5)`: keeps a target fraction of edges, prioritizing edges between higher-degree nodes.
 6. **Random Edge Sparsifier** — `random_edge_sparsifier(graph, target_ratio=0.5, seed=42)`: randomly removes edges down to a target fraction.
-7. **Simmelian Backbone Sparsifier** — `simmelian_sparsifier(graph, max_rank=5)`: keeps, for each node, only its top-ranked neighbors by shared-neighbor overlap.
-8. **Disparity Filter** — `disparity_filter(graph, alpha=0.5)`: keeps statistically significant edges per node, as described in Serrano et al. (2009), PNAS. The paper's recommended range for `alpha` is [0.01, 0.5].
-9. **Overlapping Trees** — `overlapping_trees(graph, num_trees=3)`: unions multiple randomized minimum spanning trees, as described in Garas & Argyrakis (2008), arXiv:0812.3227.
+7. **Simplified Simmelian Sparsifier** — `simplified_simmelian_sparsifier(graph, max_rank=5)`: keeps, for each node, only its top-ranked neighbors by shared-neighbor overlap. A simplified approximation of Nick et al. (2013)'s Simmelian backbone method.
+8. **Disparity Filter** — `disparity_filter(graph, alpha=0.255)`: keeps statistically significant edges per node, as described in Serrano et al. (2009), PNAS. The paper's recommended range for `alpha` is [0.01, 0.5].
+9. **Randomized Overlapping Trees** — `randomized_overlapping_trees(graph, num_trees=3, seed=42)`: unions multiple minimum spanning trees, each computed over random edge weights (the original weights are restored afterwards), inspired by Garas & Argyrakis (2009), arXiv:0812.3227.
 10. **K-Core Decomposition** — `k_core_decomposition(graph, k=None)`: recursively removes nodes with degree below `k`; defaults to returning the main (largest) core.
 
 ### Adding New Filters
@@ -171,13 +177,18 @@ To add a new filtering technique:
 
 ## Visualizing Results
 
-`src/visualization/plots.py` generates plots from one or more result CSVs (searched recursively under a given input directory):
+`src/visualization/plots.py` generates figures and tables from the result CSVs directly under a given input directory (non-recursive, so it never re-reads its own output):
 
 ```
 python -m src.visualization.plots --input results/ --output results/graphics
 ```
 
-It produces five classes of plots per graph type/benchmark/filter combination: Jaccard score by noise level, precision/recall/F1 by noise level, cosine distance between original and filtered structural-metric vectors, percentage variation of each structural metric, and the absolute value of each structural metric (filtered vs. original).
+It currently produces (NBF benchmark, Real and Simulated nets):
+
+- `lines_canberra_{real,simulated}.png`: structural preservation (RQ2) vs noise level, one panel per network domain/model, one line per filter. Structural preservation is the normalized Canberra distance between the original and filtered structural-metric vectors, `d(o, f) = (1/n) * sum_i |f_i - o_i| / (|f_i| + |o_i|)`. Each term is a symmetric relative change bounded in [0, 1], so no metric dominates because of its scale (as in NetSimile, Berlingerio et al., 2012). Average path length, diameter and degree assortativity are excluded, since they can be undefined.
+- `heatmap_filter_metric_{real,simulated}.png`: filter x structural metric heatmaps.
+- `scatter_density_jaccard_{real,simulated}.png`: retained density vs Jaccard per filter.
+- Triangle-correlation tables for the incident-texts case study and the Real/Simulated appendix, plus information-retention and predictive-metric summary tables (CSV and PNG).
 
 ## Testing
 

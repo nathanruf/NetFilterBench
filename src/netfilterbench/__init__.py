@@ -1,19 +1,19 @@
 """
 netfilterbench — benchmark network filtering and sparsification techniques.
 
-Given a graph, apply a filter (MST, PMFG, TMFG, threshold, disparity filter,
-k-core, and other sparsifiers), inject noise, and measure how well the
-filter recovers the original structure using a set of comparison metrics
-(Jaccard similarity, information retention, precision/recall/F1, and common
-structural metrics).
+Given a graph, apply a filter (maximum spanning tree, PMFG, TMFG, threshold,
+disparity filter, k-core, and other sparsifiers), inject noise, and measure
+how well the filter recovers the original structure using a set of
+comparison metrics (Jaccard similarity, information retention,
+precision/recall/F1, and common structural metrics).
 
 Quick start:
 
-    from netfilterbench import run_experiment, mst, bench_noise_filtering, calculate_jaccard_similarity
+    from netfilterbench import run_experiment, maximum_spanning_tree, bench_noise_filtering, calculate_jaccard_similarity
 
     result = run_experiment(
         graph_path="my_graph.pickle",
-        filter_func=mst,
+        filter_func=maximum_spanning_tree,
         benchmark_func=bench_noise_filtering,
         noise_level=0.1,
         indicator_funcs=[calculate_jaccard_similarity],
@@ -26,15 +26,15 @@ with `run_all`.
 
 from .net_filtering import (
     to_undirected,
-    mst,
+    maximum_spanning_tree,
     pmfg,
     tmfg,
     threshold,
-    local_degree_sparsifier,
+    degree_based_sparsifier,
     random_edge_sparsifier,
-    simmelian_sparsifier,
+    simplified_simmelian_sparsifier,
     disparity_filter,
-    overlapping_trees,
+    randomized_overlapping_trees,
     k_core_decomposition,
 )
 from .benchmark import (
@@ -53,15 +53,15 @@ __version__ = "0.1.0"
 __all__ = [
     # filters
     "to_undirected",
-    "mst",
+    "maximum_spanning_tree",
     "pmfg",
     "tmfg",
     "threshold",
-    "local_degree_sparsifier",
+    "degree_based_sparsifier",
     "random_edge_sparsifier",
-    "simmelian_sparsifier",
+    "simplified_simmelian_sparsifier",
     "disparity_filter",
-    "overlapping_trees",
+    "randomized_overlapping_trees",
     "k_core_decomposition",
     # benchmarks
     "bench_noise_filtering",
