@@ -1,4 +1,4 @@
-## Benchmarking Network Filtering
+## NetFilterBench
 
 This repository implements a framework for benchmarking network filtering and sparsification techniques. It provides real and simulated networks, a set of common filtering algorithms, and a pipeline that measures how well each filter recovers the original network structure after noise is added.
 
